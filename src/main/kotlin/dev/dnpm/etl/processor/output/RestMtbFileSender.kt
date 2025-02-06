@@ -21,6 +21,7 @@ package dev.dnpm.etl.processor.output
 
 import dev.dnpm.etl.processor.config.RestTargetProperties
 import dev.dnpm.etl.processor.monitoring.RequestStatus
+import dev.dnpm.etl.processor.PatientPseudonym
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
@@ -37,13 +38,29 @@ class RestMtbFileSender(
 
     private val logger = LoggerFactory.getLogger(RestMtbFileSender::class.java)
 
+    fun sendUrl(): String {
+        return if(restTargetProperties.isBwhc) {
+            "${restTargetProperties.uri}/MTBFile"
+        } else {
+            "${restTargetProperties.uri}/patient-record"
+        }
+    }
+
+    fun deleteUrl(patientId: PatientPseudonym): String {
+        return if(restTargetProperties.isBwhc) {
+            "${restTargetProperties.uri}/Patient/${patientId.value}"
+        } else {
+            "${restTargetProperties.uri}/patient/${patientId.value}"
+        }
+    }
+
     override fun send(request: MtbFileSender.MtbFileRequest): MtbFileSender.Response {
         try {
             return retryTemplate.execute<MtbFileSender.Response, Exception> {
                 val headers = getHttpHeaders()
                 val entityReq = HttpEntity(request.mtbFile, headers)
                 val response = restTemplate.postForEntity(
-                    "${restTargetProperties.uri}/MTBFile",
+                    sendUrl(),
                     entityReq,
                     String::class.java
                 )
@@ -72,7 +89,7 @@ class RestMtbFileSender(
                 val headers = getHttpHeaders()
                 val entityReq = HttpEntity(null, headers)
                 restTemplate.delete(
-                    "${restTargetProperties.uri}/Patient/${request.patientId}",
+                    deleteUrl(request.patientId),
                     entityReq,
                     String::class.java
                 )

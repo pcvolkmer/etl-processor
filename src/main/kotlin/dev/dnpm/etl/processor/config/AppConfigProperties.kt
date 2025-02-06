@@ -71,6 +71,7 @@ data class RestTargetProperties(
     val uri: String?,
     val username: String?,
     val password: String?,
+    val isBwhc: Boolean = false,
 ) {
     companion object {
         const val NAME = "app.rest"

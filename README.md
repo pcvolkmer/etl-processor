@@ -199,6 +199,7 @@ Folgende Umgebungsvariablen müssen gesetzt sein, damit ein bwHC-MTB-File an das
 * `APP_REST_URI`: URI der zu benutzenden API der bwHC-Backend-Instanz. z.B.: `http://localhost:9000/bwhc/etl/api`
 * `APP_REST_USERNAME`: Basic-Auth-Benutzername für bwHC-Backend
 * `APP_REST_PASSWORD`: Basic-Auth-Passwort für bwHC-Backend
+* `APP_REST_IS_BWHC`: `true` für bwHC, weglassen oder `false` für dnpm:dip
 
 #### Kafka-Topics
 
