@@ -42,14 +42,14 @@ Submission-Typ *Test* erfolgt sein. Über die Umgebungsvariable wird dieser Übe
 aktiviert. Alle Datensätze mit erteilter Teilnahme am Modelvorhaben werden mit der Test-Kennung
 übertragen.
 
-`APP_GENOM_DE_TEST_SUBMISSION` -> `true` | `false` (falls fehlt wird `true` angenommen)
+`APP_GENOM_DE_TEST_SUBMISSION` -> `true` | `false` (falls fehlt, wird `true` angenommen)
 
 ### Datenübermittlung über HTTP/REST
 
 Anfragen werden, wenn nicht als Duplikat behandelt, nach der Pseudonymisierung direkt an DNPM:DIP
 gesendet.
 
-Ein HTTP Request kann, angenommen die Installation erfolgte auf dem Host `dnpm.example.com` an
+Ein HTTP-Request kann, angenommen die Installation erfolgte auf dem Host `dnpm.example.com` an
 nachfolgende URLs gesendet werden:
 
 | HTTP-Request | URL                                     | Consent-Status im Datensatz | Bemerkung                                                                       |
@@ -166,7 +166,7 @@ Modelvorhaben §64e.
 
 ##### Konfiguration
 
-* `APP_CONSRENT_SERVICE`: Muss Wert `GICS` gesetzt sein um die Abfragen zu aktivieren. Der Wert
+* `APP_CONSENT_SERVICE`: Muss Wert `GICS` gesetzt sein um die Abfragen zu aktivieren. Der Wert
   `NONE` deaktiviert die Abfrage in gICS.
 * `APP_CONSENT_GICS_URI`: URI der gICS-Instanz (z.B. `http://localhost:8090/ttp-fhir/fhir/gics`)
 * `APP_CONSENT_GICS_USERNAME`: gIcs Basic-Auth Benutzername
@@ -296,9 +296,8 @@ In Onkostar kann es vorkommen, dass ein Wert eines Merkmalskatalogs an einem Sta
 wurde und dadurch nicht dem Wert entspricht,
 der von DNPM:DIP akzeptiert wird.
 
-Diese Anwendung bietet daher die Möglichkeit, eine Transformation vorzunehmen. Hierzu muss der "
-Pfad" innerhalb des JSON-MTB-Files angegeben werden und
-welcher Wert wie ersetzt werden soll.
+Diese Anwendung bietet daher die Möglichkeit, eine Transformation vorzunehmen. Hierzu muss der "Pfad"
+innerhalb des JSON-MTB-Files angegeben werden und welcher Wert wie ersetzt werden soll.
 
 Hier ein Beispiel für die erste (Index 0 - weitere dann mit 1,2, ...) Transformationsregel:
 
