@@ -103,11 +103,11 @@ class MtbFileRestController(
     private fun checkConsentStatus(mtbFileV2: Mtb): Pair<TtpConsentStatus, Boolean> {
         var ttpConsentStatus = iGetConsent.getTtpBroadConsentStatus(mtbFileV2.patient.id)
 
-        val isConsentOK =
-            (ttpConsentStatus == TtpConsentStatus.UNKNOWN_CHECK_FILE && mtbFileV2.metadata.modelProjectConsent.provisions.any { it.type == ConsentProvision.PERMIT })
-                    || ttpConsentStatus == TtpConsentStatus.BROAD_CONSENT_GIVEN
+        val isConsentOK = ttpConsentStatus == TtpConsentStatus.BROAD_CONSENT_GIVEN
+                || ttpConsentStatus == TtpConsentStatus.GENOM_DE_CONSENT_SEQUENCING_PERMIT
+                || ttpConsentStatus == TtpConsentStatus.UNKNOWN_CHECK_FILE && mtbFileV2.metadata?.modelProjectConsent?.provisions?.any { it.type == ConsentProvision.PERMIT } == true
 
-        if (ttpConsentStatus == TtpConsentStatus.UNKNOWN_CHECK_FILE && mtbFileV2.metadata.modelProjectConsent.provisions.none { it.type == ConsentProvision.PERMIT }) {
+        if (ttpConsentStatus == TtpConsentStatus.UNKNOWN_CHECK_FILE) {
             // in case ttp check is disabled - we propagate rejected status anyway
             ttpConsentStatus = TtpConsentStatus.BROAD_CONSENT_MISSING_OR_REJECTED
         }

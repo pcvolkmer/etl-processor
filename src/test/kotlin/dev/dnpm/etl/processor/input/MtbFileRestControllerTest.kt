@@ -33,7 +33,11 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
+import org.junit.jupiter.api.extension.ExtensionContext
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.ArgumentsProvider
+import org.junit.jupiter.params.provider.ArgumentsSource
 import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.Mock
 import org.mockito.Mockito.times
@@ -49,6 +53,7 @@ import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.time.Instant
 import java.util.*
+import java.util.stream.Stream
 
 @ExtendWith(MockitoExtension::class)
 class MtbFileRestControllerTest {
@@ -289,13 +294,13 @@ class MtbFileRestControllerTest {
         }
 
         @ParameterizedTest
-        @ValueSource(strings = ["ACTIVE", "REJECTED"])
-        fun shouldProcessPostRequest(status: String) {
+        @ArgumentsSource(Dnpm21MtbFile::class)
+        fun shouldProcessPostRequest(mtb: Mtb, broadConsent: TtpConsentStatus, shouldProcess: String) {
 
-            whenever(gicsConsentService.getTtpBroadConsentStatus(any())).thenReturn(TtpConsentStatus.BROAD_CONSENT_GIVEN)
+            whenever(gicsConsentService.getTtpBroadConsentStatus(any())).thenReturn(broadConsent)
 
             mockMvc.post("/mtbfile") {
-                content = objectMapper.writeValueAsString(dnpm21MtbFileContent(Status.valueOf(status)))
+                content = objectMapper.writeValueAsString(mtb)
                 contentType = CustomMediaType.APPLICATION_VND_DNPM_V2_MTB_JSON
             }.andExpect {
                 status {
@@ -303,30 +308,15 @@ class MtbFileRestControllerTest {
                 }
             }
 
-            verify(requestProcessor, times(1)).processMtbFile(any<Mtb>())
-        }
-
-
-        @ParameterizedTest
-        @ValueSource(strings = ["ACTIVE", "REJECTED"])
-        fun shouldProcessPostRequestWithRejectedConsent(status: String) {
-
-            whenever(gicsConsentService.getTtpBroadConsentStatus(any())).thenReturn(TtpConsentStatus.BROAD_CONSENT_MISSING_OR_REJECTED)
-
-            mockMvc.post("/mtbfile") {
-                content = objectMapper.writeValueAsString(dnpm21MtbFileContent(Status.valueOf(status)))
-                contentType = CustomMediaType.APPLICATION_VND_DNPM_V2_MTB_JSON
-            }.andExpect {
-                status {
-                    isAccepted()
-                }
+            if (shouldProcess == "process") {
+                verify(requestProcessor, times(1)).processMtbFile(any<Mtb>())
+            } else {
+                verify(requestProcessor, times(1)).processDeletion(
+                    anyValueClass(),
+                    org.mockito.kotlin.eq(broadConsent)
+                )
             }
 
-            // consent status from ttp should override file consent value
-            verify(requestProcessor, times(1)).processDeletion(
-                anyValueClass(),
-                org.mockito.kotlin.eq(TtpConsentStatus.BROAD_CONSENT_MISSING_OR_REJECTED)
-            )
         }
 
         @Test
@@ -356,27 +346,90 @@ class MtbFileRestControllerTest {
         ).withEpisode(
             Episode.builder().withId("1").withPatient("TEST_12345678").withPeriod(PeriodStart("2023-08-08")).build()
         ).build()
+    }
+}
 
-        fun dnpm21MtbFileContent(consentStatus: Status) = Mtb.builder().patient(
-            dev.pcvolkmer.mv64e.mtb.Patient.builder().id("TEST_12345678")
-                .birthDate(Date.from(Instant.parse("2000-08-08T12:34:56Z"))).gender(
-                    GenderCoding.builder().code(GenderCodingCode.MALE).build()
+open class ArgProvider(vararg val data: Arguments) : ArgumentsProvider {
+    override fun provideArguments(
+        context: ExtensionContext?
+    ): Stream<out Arguments> = Stream.of(*data)
+}
+
+class Dnpm21MtbFile : ArgProvider(
+    // No Metadata and no broad consent => delete
+    Arguments.of(
+        buildMtb(null),
+        TtpConsentStatus.BROAD_CONSENT_MISSING_OR_REJECTED,
+        "delete"
+    ),
+    // No Metadata and broad consent given => process
+    Arguments.of(
+        buildMtb(null),
+        TtpConsentStatus.BROAD_CONSENT_GIVEN,
+        "process"
+    ),
+    // No model project consent and no broad consent => delete
+    Arguments.of(
+        buildMtb(MvhMetadata.builder().modelProjectConsent(ModelProjectConsent.builder().build()).build()),
+        TtpConsentStatus.BROAD_CONSENT_MISSING_OR_REJECTED,
+        "delete"
+    ),
+    // No model project consent and broad consent given => process
+    Arguments.of(
+        buildMtb(MvhMetadata.builder().modelProjectConsent(ModelProjectConsent.builder().build()).build()),
+        TtpConsentStatus.BROAD_CONSENT_GIVEN,
+        "process"
+    ),
+    // Model project consent given and no broad consent => process
+    Arguments.of(
+        buildMtb(
+            MvhMetadata.builder().modelProjectConsent(
+                ModelProjectConsent.builder().provisions(
+                    listOf(
+                        Provision.builder().date(Date()).type(ConsentProvision.PERMIT)
+                            .purpose(ModelProjectConsentPurpose.SEQUENCING).build()
+                    )
                 ).build()
-        ).metadata(
-            if (consentStatus == Status.ACTIVE) {
-                MvhMetadata.builder().modelProjectConsent(
-                    ModelProjectConsent.builder().provisions(
-                        listOf(
-                            Provision.builder().date(Date()).type(ConsentProvision.PERMIT)
-                                .purpose(ModelProjectConsentPurpose.SEQUENCING).build()
-                        )
-                    ).build()
+            ).build()
+        ),
+        TtpConsentStatus.UNKNOWN_CHECK_FILE,
+        "process"
+    ),
+    // Model project consent given and broad consent given => process
+    Arguments.of(
+        buildMtb(
+            MvhMetadata.builder().modelProjectConsent(
+                ModelProjectConsent.builder().provisions(
+                    listOf(
+                        Provision.builder().date(Date()).type(ConsentProvision.PERMIT)
+                            .purpose(ModelProjectConsentPurpose.SEQUENCING).build()
+                    )
                 ).build()
-            } else {
-                MvhMetadata.builder().modelProjectConsent(ModelProjectConsent.builder().build()).build()
-            }
-        ).episodesOfCare(
-            listOf(MtbEpisodeOfCare.builder().id("1").patient(Reference.builder().id("TEST_12345678").build()).build())
-        ).build()
+            ).build()
+        ),
+        TtpConsentStatus.BROAD_CONSENT_GIVEN,
+        "process"
+    )
+) {
+
+    companion object {
+        fun buildMtb(metadata: MvhMetadata?): Mtb {
+            return Mtb.builder()
+                .patient(
+                    dev.pcvolkmer.mv64e.mtb.Patient.builder().id("TEST_12345678")
+                        .birthDate(Date.from(Instant.parse("2000-08-08T12:34:56Z"))).gender(
+                            GenderCoding.builder().code(GenderCodingCode.MALE).build()
+                        ).build()
+                )
+                .metadata(metadata)
+                .episodesOfCare(
+                    listOf(
+                        MtbEpisodeOfCare.builder().id("1")
+                            .patient(Reference.builder().id("TEST_12345678").build())
+                            .build()
+                    )
+                )
+                .build()
+        }
     }
 }
